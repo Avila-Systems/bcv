@@ -62,6 +62,20 @@
       .loading, .error { text-align: center; padding: 2rem 0; color: var(--muted); }
       .error { color: var(--accent); }
       a { color: inherit; }
+      .api-example { margin-top: 1.5rem; }
+      .api-example h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 .5rem; }
+      .api-example pre {
+        margin: 0;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: .85rem 1rem;
+        overflow-x: auto;
+        font-size: .85rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      .api-example a { color: var(--accent); text-decoration: none; }
+      .made-by a { color: var(--accent); text-decoration: none; font-weight: 600; }
     </style>
   </head>
   <body>
@@ -73,6 +87,12 @@
       <div id="content" class="card">
         <div class="loading">Cargando tasas…</div>
       </div>
+
+      <section class="api-example" id="api-example" hidden>
+        <h2>API</h2>
+        <pre id="api-curl"></pre>
+      </section>
+
       <footer id="footer"></footer>
     </main>
 
@@ -90,6 +110,34 @@
           minimumFractionDigits: 2,
           maximumFractionDigits: 8,
         }).format(n);
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) =>
+          ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
+        );
+      }
+
+      async function loadConfig() {
+        const footer = document.getElementById('footer');
+        try {
+          const cfg = await (await fetch('/api/config')).json();
+
+          const endpoint = `${cfg.apiBaseUrl}/api/rates`;
+          const section = document.getElementById('api-example');
+          const pre = document.getElementById('api-curl');
+          pre.innerHTML =
+            `$ curl <a href="${escapeHtml(endpoint)}" target="_blank" rel="noreferrer">${escapeHtml(endpoint)}</a>`;
+          section.hidden = false;
+
+          const name = escapeHtml(cfg.madeByName || 'Avila Systems');
+          const madeBy = cfg.madeByUrl
+            ? `<span class="made-by">Creado por: <a href="${escapeHtml(cfg.madeByUrl)}" target="_blank" rel="noreferrer">${name}</a></span>`
+            : `<span class="made-by">Creado por: ${name}</span>`;
+          footer.dataset.madeBy = madeBy;
+        } catch {
+          /* config is best-effort; page still works without it */
+        }
       }
 
       async function load() {
@@ -116,16 +164,18 @@
             ? ' <span class="stale">(datos en caché, no se pudo actualizar)</span>'
             : '';
           const ref = data.referenceDate ? `Fecha de referencia: ${data.referenceDate}<br>` : '';
+          const madeBy = footer.dataset.madeBy ? `<br>${footer.dataset.madeBy}` : '';
           footer.innerHTML =
             ref + `Actualizado: ${updated}${staleNote}<br>` +
-            'Fuente: <a href="https://www.bcv.org.ve/" target="_blank" rel="noreferrer">bcv.org.ve</a>';
+            'Fuente: <a href="https://www.bcv.org.ve/" target="_blank" rel="noreferrer">bcv.org.ve</a>' +
+            madeBy;
         } catch (err) {
           content.innerHTML = '<div class="error">No se pudieron cargar las tasas. Intenta de nuevo.</div>';
           footer.textContent = String(err.message || err);
         }
       }
 
-      load();
+      loadConfig().then(load);
     </script>
   </body>
 </html>

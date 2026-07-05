@@ -21,7 +21,22 @@ npm start
 
 Then open http://localhost:3000/ or query the API.
 
-Set a custom port with `PORT=8080 npm start`.
+### Environment variables
+
+| Variable          | Default              | Purpose                                                        |
+| ----------------- | -------------------- | -------------------------------------------------------------- |
+| `PORT`            | `3000`               | Port to listen on.                                             |
+| `PUBLIC_BASE_URL` | (the requesting host)| Domain shown in the API example on the front page, e.g. `https://tasas.example.com`. |
+| `MADE_BY_NAME`    | `Avila Systems`      | Name in the "Made by" credit.                                  |
+| `MADE_BY_URL`     | (none — plain text)  | Link target for the "Made by" credit.                          |
+
+Example:
+
+```bash
+PUBLIC_BASE_URL=https://tasas.example.com \
+MADE_BY_URL=https://avilasystems.example \
+npm start
+```
 
 ## API
 

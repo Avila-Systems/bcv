@@ -21,6 +21,18 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
+// Front-end configuration (domain shown in the API example + "made by" link).
+// Values come from environment variables; the API base falls back to the
+// requesting host so the example is always accurate even when unset.
+app.get('/api/config', (req, res) => {
+  const fallbackBase = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    apiBaseUrl: (process.env.PUBLIC_BASE_URL || fallbackBase).replace(/\/+$/, ''),
+    madeByName: process.env.MADE_BY_NAME || 'Avila Systems',
+    madeByUrl: process.env.MADE_BY_URL || '',
+  });
+});
+
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 app.listen(PORT, () => {
