@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tasas BCV — Banco Central de Venezuela</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f6f8;
+        --card: #ffffff;
+        --text: #1a1a2e;
+        --muted: #6b7280;
+        --accent: #b91c1c;
+        --border: #e5e7eb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1115;
+          --card: #191c22;
+          --text: #f3f4f6;
+          --muted: #9ca3af;
+          --accent: #f87171;
+          --border: #2a2e37;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: flex;
+        justify-content: center;
+        padding: 2rem 1rem;
+      }
+      main { width: 100%; max-width: 560px; }
+      header { text-align: center; margin-bottom: 1.5rem; }
+      h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+      .subtitle { color: var(--muted); font-size: .9rem; margin: 0; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: .5rem 1.25rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      }
+      .row {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        padding: .9rem 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .row:last-child { border-bottom: none; }
+      .code { font-weight: 600; font-size: 1.05rem; }
+      .name { color: var(--muted); font-size: .8rem; margin-left: .5rem; }
+      .value { font-variant-numeric: tabular-nums; font-size: 1.15rem; font-weight: 600; }
+      .value small { color: var(--muted); font-weight: 400; font-size: .75rem; }
+      footer { text-align: center; color: var(--muted); font-size: .78rem; margin-top: 1.25rem; line-height: 1.5; }
+      .stale { color: var(--accent); }
+      .loading, .error { text-align: center; padding: 2rem 0; color: var(--muted); }
+      .error { color: var(--accent); }
+      a { color: inherit; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Tasas de Cambio — BCV</h1>
+        <p class="subtitle">Banco Central de Venezuela</p>
+      </header>
+      <div id="content" class="card">
+        <div class="loading">Cargando tasas…</div>
+      </div>
+      <footer id="footer"></footer>
+    </main>
+
+    <script>
+      const NAMES = {
+        USD: 'Dólar estadounidense',
+        EUR: 'Euro',
+        CNY: 'Yuan chino',
+        TRY: 'Lira turca',
+        RUB: 'Rublo ruso',
+      };
+
+      function fmt(n) {
+        return new Intl.NumberFormat('es-VE', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 8,
+        }).format(n);
+      }
+
+      async function load() {
+        const content = document.getElementById('content');
+        const footer = document.getElementById('footer');
+        try {
+          const res = await fetch('/api/rates');
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+
+          const rows = Object.entries(data.rates)
+            .map(
+              ([code, value]) => `
+              <div class="row">
+                <div><span class="code">${code}</span><span class="name">${NAMES[code] || ''}</span></div>
+                <div class="value">${fmt(value)} <small>Bs.</small></div>
+              </div>`
+            )
+            .join('');
+          content.innerHTML = rows || '<div class="error">Sin datos.</div>';
+
+          const updated = new Date(data.fetchedAt).toLocaleString('es-VE');
+          const staleNote = data.stale
+            ? ' <span class="stale">(datos en caché, no se pudo actualizar)</span>'
+            : '';
+          const ref = data.referenceDate ? `Fecha de referencia: ${data.referenceDate}<br>` : '';
+          footer.innerHTML =
+            ref + `Actualizado: ${updated}${staleNote}<br>` +
+            'Fuente: <a href="https://www.bcv.org.ve/" target="_blank" rel="noreferrer">bcv.org.ve</a>';
+        } catch (err) {
+          content.innerHTML = '<div class="error">No se pudieron cargar las tasas. Intenta de nuevo.</div>';
+          footer.textContent = String(err.message || err);
+        }
+      }
+
+      load();
+    </script>
+  </body>
+</html>
