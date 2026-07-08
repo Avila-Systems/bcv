@@ -34,7 +34,7 @@
         justify-content: center;
         padding: 2rem 1rem;
       }
-      main { width: 100%; max-width: 560px; }
+      main { width: 100%; max-width: 720px; }
       header { text-align: center; margin-bottom: 1.5rem; }
       h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
       .subtitle { color: var(--muted); font-size: .9rem; margin: 0; }
@@ -45,6 +45,30 @@
         padding: .5rem 1.25rem;
         box-shadow: 0 1px 3px rgba(0,0,0,.06);
       }
+      /* Tasa vigente (grande) + tasa del día siguiente (más pequeña) al lado. */
+      .rates-layout { display: flex; gap: 1rem; align-items: flex-start; }
+      .rates-main { flex: 1.6 1 0; }
+      .rates-next { flex: 1 1 0; opacity: .92; }
+      .rates-next .row { padding: .6rem 0; }
+      .rates-next .code { font-size: .95rem; }
+      .rates-next .value { font-size: .98rem; }
+      @media (max-width: 640px) {
+        .rates-layout { flex-direction: column; }
+      }
+      .fecha-valor {
+        display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+        padding: .85rem 0 .5rem;
+        font-size: .92rem; font-weight: 600;
+        border-bottom: 1px solid var(--border);
+      }
+      .rates-next .fecha-valor { font-size: .82rem; color: var(--muted); }
+      .badge-vigente {
+        font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+        text-transform: uppercase;
+        color: #fff; background: var(--accent);
+        padding: .12rem .5rem; border-radius: 999px;
+      }
+      .next-label { color: var(--muted); font-size: .74rem; padding: .35rem 0 .1rem; }
       .row {
         display: flex;
         align-items: baseline;
@@ -57,11 +81,25 @@
       .name { color: var(--muted); font-size: .8rem; margin-left: .5rem; }
       .value { font-variant-numeric: tabular-nums; font-size: 1.15rem; font-weight: 600; }
       .value small { color: var(--muted); font-weight: 400; font-size: .75rem; }
+      .stale-note { color: var(--accent); font-size: .78rem; padding: .5rem 0 0; }
       footer { text-align: center; color: var(--muted); font-size: .78rem; margin-top: 1.25rem; line-height: 1.5; }
       .stale { color: var(--accent); }
       .loading, .error { text-align: center; padding: 2rem 0; color: var(--muted); }
       .error { color: var(--accent); }
       a { color: inherit; }
+      .info-fecha-valor {
+        margin-top: 1.5rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1rem 1.25rem;
+        font-size: .84rem;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+      .info-fecha-valor h2 { font-size: .9rem; color: var(--text); margin: 0 0 .5rem; }
+      .info-fecha-valor p { margin: 0 0 .6rem; }
+      .info-fecha-valor p:last-child { margin-bottom: 0; }
       .api-example { margin-top: 1.5rem; }
       .api-example h2 { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 .5rem; }
       .api-example pre {
@@ -84,9 +122,28 @@
         <h1>Tasas de Cambio — BCV</h1>
         <p class="subtitle">Banco Central de Venezuela</p>
       </header>
-      <div id="content" class="card">
-        <div class="loading">Cargando tasas…</div>
+
+      <div id="content">
+        <div class="card"><div class="loading">Cargando tasas…</div></div>
       </div>
+
+      <section class="info-fecha-valor">
+        <h2>¿Qué es la fecha valor?</h2>
+        <p>
+          La <strong>fecha valor</strong> es el día exacto en que una tasa de cambio
+          oficial del BCV entra en vigencia. Es la fecha a partir de la cual los bancos
+          y operadores cambiarios deben aplicar el valor publicado para liquidar
+          operaciones y transacciones de divisas.
+        </p>
+        <p>
+          El BCV publica la tasa del <strong>día siguiente</strong> aproximadamente
+          entre las 3:00 y 4:00 p.&nbsp;m. (hora de Venezuela). Sin embargo, la tasa
+          <strong>vigente</strong> continúa siendo la anterior hasta las 12:00 de la
+          medianoche. Por eso, la tabla principal muestra siempre la tasa cuya fecha
+          valor corresponde al día en curso, y —cuando ya está disponible— la tasa del
+          día siguiente aparece al lado en un tamaño más pequeño.
+        </p>
+      </section>
 
       <section class="api-example" id="api-example" hidden>
         <h2>API</h2>
@@ -105,6 +162,11 @@
         RUB: 'Rublo ruso',
       };
 
+      const MESES = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+      ];
+
       function fmt(n) {
         return new Intl.NumberFormat('es-VE', {
           minimumFractionDigits: 2,
@@ -112,10 +174,30 @@
         }).format(n);
       }
 
+      // "2026-07-08" -> "8 de julio de 2026" (sin desfase de zona horaria).
+      function formatFechaValor(iso) {
+        if (!iso) return '';
+        const [y, m, d] = String(iso).split('-').map(Number);
+        if (!y || !m || !d) return iso;
+        return `${d} de ${MESES[m - 1]} de ${y}`;
+      }
+
       function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, (c) =>
           ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])
         );
+      }
+
+      function renderRows(rates) {
+        return Object.entries(rates)
+          .map(
+            ([code, value]) => `
+              <div class="row">
+                <div><span class="code">${code}</span><span class="name">${NAMES[code] || ''}</span></div>
+                <div class="value">${fmt(value)} <small>Bs.</small></div>
+              </div>`
+          )
+          .join('');
       }
 
       async function loadConfig() {
@@ -148,29 +230,48 @@
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
 
-          const rows = Object.entries(data.rates)
-            .map(
-              ([code, value]) => `
-              <div class="row">
-                <div><span class="code">${code}</span><span class="name">${NAMES[code] || ''}</span></div>
-                <div class="value">${fmt(value)} <small>Bs.</small></div>
-              </div>`
-            )
-            .join('');
-          content.innerHTML = rows || '<div class="error">Sin datos.</div>';
+          const current = data.current || { rates: data.rates, fechaValor: null };
+          const next = data.next;
 
-          const updated = new Date(data.fetchedAt).toLocaleString('es-VE');
           const staleNote = data.stale
-            ? ' <span class="stale">(datos en caché, no se pudo actualizar)</span>'
+            ? `<div class="stale-note">Aún no se dispone de la tasa vigente de hoy; se muestra la más reciente publicada.</div>`
             : '';
-          const ref = data.referenceDate ? `Fecha de referencia: ${data.referenceDate}<br>` : '';
+
+          const mainCard = `
+            <div class="card rates-main">
+              <div class="fecha-valor">
+                Fecha valor: ${escapeHtml(formatFechaValor(current.fechaValor)) || 'no disponible'}
+                <span class="badge-vigente">Vigente</span>
+              </div>
+              ${renderRows(current.rates)}
+              ${staleNote}
+            </div>`;
+
+          const nextCard = next
+            ? `
+              <aside class="card rates-next">
+                <div class="fecha-valor">Fecha valor: ${escapeHtml(formatFechaValor(next.fechaValor))}</div>
+                <div class="next-label">Próxima tasa — entra en vigencia el ${escapeHtml(formatFechaValor(next.fechaValor))}</div>
+                ${renderRows(next.rates)}
+              </aside>`
+            : '';
+
+          content.innerHTML =
+            current.rates && Object.keys(current.rates).length
+              ? `<div class="rates-layout">${mainCard}${nextCard}</div>`
+              : '<div class="card"><div class="error">Sin datos.</div></div>';
+
+          const updated = data.scrapedAt
+            ? new Date(data.scrapedAt).toLocaleString('es-VE', { timeZone: 'America/Caracas' })
+            : '';
+          const updatedNote = updated ? `Actualizado: ${updated} (hora de Venezuela)<br>` : '';
           const madeBy = footer.dataset.madeBy ? `<br>${footer.dataset.madeBy}` : '';
           footer.innerHTML =
-            ref + `Actualizado: ${updated}${staleNote}<br>` +
+            updatedNote +
             'Fuente: <a href="https://www.bcv.org.ve/" target="_blank" rel="noreferrer">bcv.org.ve</a>' +
             madeBy;
         } catch (err) {
-          content.innerHTML = '<div class="error">No se pudieron cargar las tasas. Intenta de nuevo.</div>';
+          content.innerHTML = '<div class="card"><div class="error">No se pudieron cargar las tasas. Intenta de nuevo.</div></div>';
           footer.textContent = String(err.message || err);
         }
       }

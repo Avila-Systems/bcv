@@ -1,6 +1,7 @@
 import https from 'node:https';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { normalizeFechaValor } from './time.js';
 
 const BCV_URL = 'https://www.bcv.org.ve/';
 
@@ -49,14 +50,18 @@ export async function scrapeRates() {
     throw new Error('No exchange rates could be parsed from the BCV page');
   }
 
-  // Reference date the rates are valid for (BCV publishes it near the rates).
+  // Fecha valor: el día en que estas tasas entran en vigencia. El BCV la
+  // publica junto a las tasas. Después de las ~3-4pm (hora VE) esta fecha ya
+  // corresponde al DÍA SIGUIENTE, aunque la tasa vigente siga siendo la previa.
   const dateAttr = $('.pull-right .date-display-single').attr('content');
   const dateText = $('.pull-right .date-display-single').first().text().trim();
   const referenceDate = dateAttr || dateText || null;
+  const fechaValor = normalizeFechaValor(dateAttr) || normalizeFechaValor(dateText);
 
   return {
     rates,
     referenceDate,
+    fechaValor,
     scrapedAt: new Date().toISOString(),
   };
 }
